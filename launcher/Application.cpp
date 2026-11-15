@@ -1241,26 +1241,9 @@ Application::Application(int& argc, char** argv) : QApplication(argc, argv)
 
 bool Application::createSetupWizard()
 {
-    bool javaRequired = [this]() {
-        if (BuildConfig.JAVA_DOWNLOADER_ENABLED && settings()->get("AutomaticJavaDownload").toBool()) {
-            return false;
-        }
-        bool ignoreJavaWizard = settings()->get("IgnoreJavaWizard").toBool();
-        if (ignoreJavaWizard) {
-            return false;
-        }
-        QString currentHostName = QHostInfo::localHostName();
-        QString oldHostName = settings()->get("LastHostname").toString();
-        if (currentHostName != oldHostName) {
-            settings()->set("LastHostname", currentHostName);
-            return true;
-        }
-        QString currentJavaPath = settings()->get("JavaPath").toString();
-        QString actualPath = FS::ResolveExecutable(currentJavaPath);
-        return actualPath.isNull();
-    }();
-    bool askjava = BuildConfig.JAVA_DOWNLOADER_ENABLED && !javaRequired && !settings()->get("AutomaticJavaDownload").toBool() &&
-                   !settings()->get("AutomaticJavaSwitch").toBool() && !settings()->get("UserAskedAboutAutomaticJavaDownload").toBool();
+    // Servers download a private Java runtime into the app data folder.
+    bool javaRequired = false;
+    bool askjava = false;
     bool languageRequired = settings()->get("Language").toString().isEmpty();
     bool pasteInterventionRequired = settings()->get("PastebinURL") != "";
     bool validWidgets = m_themeManager->isValidApplicationTheme(settings()->get("ApplicationTheme").toString());

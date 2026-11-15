@@ -35,7 +35,7 @@ void ServerProcessLaunch::executeTask()
 
     const auto javaPath = FS::ResolveExecutable(settings->get("JavaPath").toString());
     if (javaPath.isEmpty()) {
-        const auto reason = tr("Java path is not valid. Set Java in Settings, then start the server again.");
+        const auto reason = tr("PrismServer could not prepare its own Java runtime. Check the internet connection and start the server again.");
         emit logLine(reason, MessageLevel::Fatal);
         emitFailed(reason);
         return;

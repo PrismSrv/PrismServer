@@ -19,6 +19,9 @@ foreach ($dir in @("generic", "iconengines", "imageformats", "networkinformation
 Get-ChildItem $debug -File | Where-Object {
     $_.Extension -in ".dll", ".exe" -and $_.Name -notlike "LauncherTests*"
 } | Copy-Item -Destination $stage
+$jars = Join-Path $stage "jars"
+New-Item $jars -ItemType Directory | Out-Null
+Copy-Item (Join-Path $sourceRoot "build\jars\JavaCheck.jar") $jars
 Copy-Item "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Redist\MSVC\14.44.35112\x64\Microsoft.VC143.CRT\*" $stage
 Set-Content -Path (Join-Path $stage "qt.conf") -Value "[Paths]`r`nPrefix=." -Encoding Ascii
 

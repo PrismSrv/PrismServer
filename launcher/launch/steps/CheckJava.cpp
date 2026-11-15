@@ -38,6 +38,8 @@
 #include <launch/LaunchTask.h>
 #include <QCryptographicHash>
 #include <QFileInfo>
+#include <QProcess>
+#include <QRegularExpression>
 #include <QStandardPaths>
 #include "java/JavaUtils.h"
 
@@ -71,9 +73,23 @@ void CheckJava::executeTask()
     }
 
     if (JavaUtils::getJavaCheckPath().isEmpty()) {
-        const char* reason = QT_TR_NOOP("Java checker library could not be found. Please check your installation.");
-        emit logLine(tr(reason), MessageLevel::Fatal);
-        emitFailed(tr(reason));
+        QProcess process;
+        process.start(realJavaPath, { QStringLiteral("-version") });
+        if (!process.waitForFinished(8000) || process.exitStatus() != QProcess::NormalExit) {
+            emit logLine(tr("Could not start Java:\n  %1").arg(realJavaPath), MessageLevel::Fatal);
+            emitFailed(tr("Could not start Java."));
+            return;
+        }
+        const auto output = QString::fromLocal8Bit(process.readAllStandardError() + process.readAllStandardOutput());
+        static const QRegularExpression versionLine(QStringLiteral("version \"([^\"]+)\""));
+        const auto match = versionLine.match(output);
+        const auto version = match.hasMatch() ? match.captured(1) : QString();
+        if (!version.isEmpty())
+            settings->set("JavaVersion", version);
+        settings->set("JavaSignature", m_javaSignature);
+        printJavaInfo(version, QString(), QString(), QString());
+        m_parent->instance()->updateRuntimeContext();
+        emitSucceeded();
         return;
     }
 
