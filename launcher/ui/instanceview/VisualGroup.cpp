@@ -40,6 +40,8 @@
 #include <QDebug>
 #include <QModelIndex>
 #include <QPainter>
+#include <QStyle>
+#include <QStyleOptionButton>
 #include <QtMath>
 #include <utility>
 
@@ -126,12 +128,14 @@ VisualGroup::HitResults VisualGroup::hitScan(const QPoint& pos) const
         results = VisualGroup::NoHit;
     } else if (y < body_start) {
         results = VisualGroup::HeaderHit;
-        int collapseSize = headerHeight() - 4;
-
-        // the icon
-        QRect iconRect = QRect(view->m_leftMargin + 2, 2 + y_start, view->width() - 4, collapseSize);
-        if (iconRect.contains(pos)) {
-            results |= VisualGroup::CheckboxHit;
+        if (startButtonRect().contains(pos)) {
+            results |= VisualGroup::StartHit;
+        } else {
+            int collapseSize = headerHeight() - 4;
+            QRect iconRect = QRect(view->m_leftMargin + 2, 2 + y_start, view->width() - 4, collapseSize);
+            if (iconRect.contains(pos)) {
+                results |= VisualGroup::CheckboxHit;
+            }
         }
     } else if (y < body_end) {
         results |= VisualGroup::BodyHit;
@@ -180,17 +184,26 @@ void VisualGroup::drawHeader(QPainter* painter, const QStyleOptionViewItem& opti
     }
     // END: arrow
 
+    const QRect button = startButtonRect().translated(0, -view->verticalOffset());
+
     // BEGIN: text
     {
         QRect textRect(optRect);
         textRect.setTop(textRect.top());
         textRect.setLeft(textOffsetLeft);
         textRect.setHeight(fontMetrics.height());
-        textRect.setRight(textRect.right() - 7);
+        textRect.setRight(button.left() - 12);
 
         painter->drawText(textRect, Qt::AlignLeft | Qt::AlignVCenter, textToDraw);
     }
     // END: text
+    {
+        QStyleOptionButton buttonOption;
+        buttonOption.rect = button;
+        buttonOption.state = QStyle::State_Enabled;
+        buttonOption.text = QObject::tr("Start");
+        QApplication::style()->drawControl(QStyle::CE_PushButton, &buttonOption, painter);
+    }
 
     // BEGIN: horizontal line
     {
@@ -200,11 +213,13 @@ void VisualGroup::drawHeader(QPainter* painter, const QStyleOptionViewItem& opti
         // startPoint is left + arrow + text + space
         const int startPoint =
             optRect.left() + fontMetrics.height() + fontMetrics.size(Qt::AlignLeft | Qt::AlignVCenter, textToDraw).width() + 20;
+        if (startPoint >= button.left() - 8)
+            return;
         painter->setRenderHint(QPainter::Antialiasing, false);
         QPolygon polygon;
         // for some reason the height (yPos) doesn't look centered, so we are adding 1 to the center height
         const int lineHeight = centerHeight + 1;
-        polygon << QPoint(startPoint, lineHeight) << QPoint(optRect.right() - 3, lineHeight);
+        polygon << QPoint(startPoint, lineHeight) << QPoint(button.left() - 8, lineHeight);
         painter->drawPolyline(polygon);
     }
     // END: horizontal line
@@ -213,6 +228,15 @@ void VisualGroup::drawHeader(QPainter* painter, const QStyleOptionViewItem& opti
 int VisualGroup::totalHeight() const
 {
     return headerHeight() + contentHeight();
+}
+
+QRect VisualGroup::startButtonRect() const
+{
+    const int width = 68;
+    const int height = qMax(18, headerHeight() - 10);
+    const int x = view->viewport()->width() - view->m_rightMargin - width;
+    const int y = verticalPosition() + 6;
+    return QRect(x, y, width, height);
 }
 
 int VisualGroup::headerHeight()

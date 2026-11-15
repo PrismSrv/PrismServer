@@ -46,10 +46,11 @@
 #include <utility>
 
 #include "Application.h"
+#include "minecraft/MinecraftInstance.h"
 #include "ui/dialogs/ResourceDownloadDialog.h"
 
 namespace {
-ResourceDownload::ResourceDescriptor prepareModDescriptor()
+ResourceDownload::ResourceDescriptor prepareModDescriptor(bool plugin)
 {
     QMap<QString, QString> urlHandlers;
     urlHandlers.insert(QRegularExpression::anchoredPattern(R"((?:www\.)?modrinth\.com\/mod\/([^\/]+)\/?)"), "modrinth");
@@ -57,10 +58,8 @@ ResourceDownload::ResourceDescriptor prepareModDescriptor()
     urlHandlers.insert(QRegularExpression::anchoredPattern(R"(minecraft\.curseforge\.com\/projects\/([^\/]+)\/?)"), "curseforge");
     return {
         .helpPage = "Mod-platform",
-        //: The singular version of 'mods'
-        .resourceString = QObject::tr("mod"),
-        //: The plural version of 'mod'
-        .resourcesString = QObject::tr("mods"),
+        .resourceString = plugin ? QObject::tr("plugin") : QObject::tr("mod"),
+        .resourcesString = plugin ? QObject::tr("plugins") : QObject::tr("mods"),
         .supportsFiltering = true,
         .isIndexed = true,
         .urlHandlers = urlHandlers,
@@ -74,7 +73,13 @@ ModPage::ModPage(ResourceDownloadDialog* dialog,
                  ResourceProviderData p,
                  const ResourceAPI* api,
                  ModFilterWidget* filterWidget)
-    : ResourcePage(dialog, instance, prepareModDescriptor(), std::move(p)), m_api(api)
+    : ResourcePage(dialog, instance,
+                   prepareModDescriptor([](BaseInstance& inst) {
+                       auto* server = dynamic_cast<MinecraftInstance*>(&inst);
+                       return server && server->isServer();
+                   }(instance)),
+                   std::move(p)),
+      m_api(api)
 {
     auto* model = new ModModel(instance, getDialog()->getBaseModel(), api, debugName(), metaEntryBase());
     m_model = model;

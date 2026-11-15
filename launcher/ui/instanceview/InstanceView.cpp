@@ -276,6 +276,12 @@ void InstanceView::mousePressEvent(QMouseEvent* event)
     if (event->button() == Qt::LeftButton) {
         VisualGroup::HitResults hitResult;
         m_pressedCategory = categoryAt(geometryPos, hitResult);
+        if (m_pressedCategory && hitResult & VisualGroup::StartHit) {
+            emit groupStartRequested(m_pressedCategory->text);
+            m_pressedCategory = nullptr;
+            event->accept();
+            return;
+        }
         if (m_pressedCategory && hitResult & VisualGroup::CheckboxHit) {
             setState(m_pressedCategory->collapsed ? ExpandingState : CollapsingState);
             event->accept();

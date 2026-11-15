@@ -52,6 +52,7 @@
 #include "minecraft/auth/MinecraftAccount.h"
 
 class LaunchController;
+class QSystemTrayIcon;
 class LocalPeer;
 class InstanceWindow;
 class MainWindow;
@@ -191,6 +192,7 @@ class Application : public QApplication {
     bool updatesAreAllowed() const;
 
     void ShowGlobalSettings(class QWidget* parent, QString openPage = QString());
+    void syncStartOnBoot();
 
     bool updaterEnabled();
     static QString updaterBinaryName();
@@ -227,6 +229,10 @@ class Application : public QApplication {
     static bool handleDataMigration(const QString& currentData, const QString& oldData, const QString& name, const QString& configFile);
     bool createSetupWizard();
     void performMainStartupAction();
+    void showBootTray();
+    void launchBootInstances();
+    void quitBootTray();
+    bool anyInstanceStartsOnBoot() const;
 
     // sets the fatal error message and m_status to Failed.
     void showFatalErrorMessage(const QString& title, const QString& content);
@@ -306,6 +312,9 @@ class Application : public QApplication {
     QList<QUrl> m_urlsToImport;
     QString m_instanceIdToShowWindowOf;
     bool m_showMainWindow = false;
+    bool m_startOnBoot = false;
+    bool m_trayQuitting = false;
+    QSystemTrayIcon* m_tray = nullptr;
     std::unique_ptr<QFile> logFile;
     std::unique_ptr<LogModel> logModel;
 

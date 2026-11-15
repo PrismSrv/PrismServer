@@ -108,6 +108,8 @@ class InstanceList : public QAbstractListModel {
     QModelIndex getInstanceIndexById(const QString& id) const;
     QStringList getGroups();
     bool isGroupCollapsed(const QString& groupName);
+    bool groupStartsOnBoot(const QString& groupName) const;
+    void setGroupStartsOnBoot(const QString& groupName, bool enabled);
 
     GroupId getInstanceGroup(const InstanceId& id) const;
     void setInstanceGroup(const InstanceId& id, GroupId name);
@@ -188,6 +190,7 @@ class InstanceList : public QAbstractListModel {
     QFileSystemWatcher* m_watcher;
     // FIXME: this is so inefficient that looking at it is almost painful.
     QSet<QString> m_collapsedGroups;
+    QSet<QString> m_bootGroups;
     QMap<InstanceId, GroupId> m_instanceGroupIndex;
     QSet<InstanceId> m_instanceSet;
     bool m_groupsLoaded = false;

@@ -90,6 +90,10 @@
 
 #include <QAccessible>
 #include <QCommandLineParser>
+#include <QMenu>
+#include <QSettings>
+#include <QSystemTrayIcon>
+#include <QTimer>
 #include <QDebug>
 #include <QDir>
 #include <QFileInfo>
@@ -327,6 +331,7 @@ Application::Application(int& argc, char** argv) : QApplication(argc, argv)
           { { "o", "offline" }, "Launch offline, with given player name (only valid in combination with --launch)", "offline" },
           { "alive", "Write a small '" + g_liveCheckFile + "' file after the launcher starts" },
           { "show-window", "Show the main launcher window (useful in combination with --launch)" },
+          { "start-on-boot", "Start enabled servers from the notification area without opening the main window" },
           { { "I", "import" }, "Import instance or resource from specified local path or URL", "url" },
           { "show", "Opens the window for the specified instance (by instance ID)", "show" } });
     // Has to be positional for some OS to handle that properly
@@ -349,6 +354,7 @@ Application::Application(int& argc, char** argv) : QApplication(argc, argv)
 
     m_instanceIdToShowWindowOf = parser.value("show");
     m_showMainWindow = parser.isSet("show-window");
+    m_startOnBoot = parser.isSet("start-on-boot");
 
     for (const auto& url : parser.values("import")) {
         m_urlsToImport.append(normalizeImportUrl(url));
@@ -1241,6 +1247,8 @@ Application::Application(int& argc, char** argv) : QApplication(argc, argv)
 
 bool Application::createSetupWizard()
 {
+    if (m_startOnBoot)
+        return false;
     // Servers download a private Java runtime into the app data folder.
     bool javaRequired = false;
     bool askjava = false;
@@ -1346,6 +1354,12 @@ bool Application::event(QEvent* event)
 void Application::performMainStartupAction()
 {
     m_status = Application::Initialized;
+    syncStartOnBoot();
+    if (m_startOnBoot) {
+        showBootTray();
+        QTimer::singleShot(0, this, &Application::launchBootInstances);
+        return;
+    }
     if (!m_instanceIdToLaunch.isEmpty()) {
         auto* inst = instances()->getInstanceById(m_instanceIdToLaunch);
         if (inst) {
@@ -1607,6 +1621,7 @@ void Application::addRunningInstance()
     m_runningInstances++;
     if (m_runningInstances == 1) {
         emit updateAllowedChanged(false);
+        showBootTray();
     }
 }
 
@@ -1619,12 +1634,118 @@ void Application::subRunningInstance()
     m_runningInstances--;
     if (m_runningInstances == 0) {
         emit updateAllowedChanged(true);
+        if (!m_startOnBoot && m_tray && !m_trayQuitting) {
+            m_tray->hide();
+            m_tray->deleteLater();
+            m_tray = nullptr;
+        }
     }
 }
 
 bool Application::shouldExitNow() const
 {
+    if (m_trayQuitting)
+        return m_runningInstances == 0;
+    if (m_startOnBoot)
+        return false;
     return m_runningInstances == 0 && m_openWindows == 0;
+}
+
+bool Application::anyInstanceStartsOnBoot() const
+{
+    if (!m_instances)
+        return false;
+    for (int i = 0; i < m_instances->count(); ++i) {
+        auto* inst = m_instances->at(i);
+        if (!inst->isServer())
+            continue;
+        if (inst->settings()->get("StartOnBoot").toBool())
+            return true;
+        const auto group = m_instances->getInstanceGroup(inst->id());
+        if (!group.isEmpty() && m_instances->groupStartsOnBoot(group))
+            return true;
+    }
+    return false;
+}
+
+void Application::syncStartOnBoot()
+{
+#ifdef Q_OS_WIN
+    QSettings run(QStringLiteral("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run"), QSettings::NativeFormat);
+    const QString key = QStringLiteral("PrismServer");
+    if (anyInstanceStartsOnBoot()) {
+        const auto command = QStringLiteral("\"%1\" --start-on-boot").arg(QDir::toNativeSeparators(applicationFilePath()));
+        run.setValue(key, command);
+    } else {
+        run.remove(key);
+    }
+#endif
+}
+
+void Application::showBootTray()
+{
+    if (m_tray)
+        return;
+    if (!QSystemTrayIcon::isSystemTrayAvailable()) {
+        qWarning() << "No system tray is available. Servers will still start.";
+        return;
+    }
+    m_tray = new QSystemTrayIcon(logo(), this);
+    auto* menu = new QMenu();
+    menu->QObject::setParent(m_tray);
+    menu->addAction(tr("Open PrismServer"), this, [this] { showMainWindow(); });
+    menu->addSeparator();
+    menu->addAction(tr("Quit"), this, &Application::quitBootTray);
+    m_tray->setToolTip(tr("PrismServer"));
+    m_tray->setContextMenu(menu);
+    connect(m_tray, &QSystemTrayIcon::activated, this, [this](QSystemTrayIcon::ActivationReason reason) {
+        if (reason == QSystemTrayIcon::Trigger || reason == QSystemTrayIcon::DoubleClick)
+            showMainWindow();
+    });
+    m_tray->show();
+}
+
+void Application::launchBootInstances()
+{
+    if (!m_instances)
+        return;
+    QStringList ids;
+    for (int i = 0; i < m_instances->count(); ++i) {
+        auto* inst = m_instances->at(i);
+        if (!inst->isServer())
+            continue;
+        const auto group = m_instances->getInstanceGroup(inst->id());
+        const bool grouped = !group.isEmpty() && m_instances->groupStartsOnBoot(group);
+        if (inst->settings()->get("StartOnBoot").toBool() || grouped)
+            ids << inst->id();
+    }
+    for (int i = 0; i < ids.size(); ++i) {
+        const auto id = ids.at(i);
+        QTimer::singleShot(i * 1500, this, [this, id] {
+            auto* inst = instances()->getInstanceById(id);
+            if (inst && !inst->isRunning())
+                launch(inst);
+        });
+    }
+}
+
+void Application::quitBootTray()
+{
+    m_trayQuitting = true;
+    bool stopping = false;
+    if (m_instances) {
+        for (int i = 0; i < m_instances->count(); ++i) {
+            auto* inst = m_instances->at(i);
+            if (inst->isRunning()) {
+                kill(inst);
+                stopping = true;
+            }
+        }
+    }
+    if (!stopping)
+        exit(0);
+    else
+        QTimer::singleShot(20000, this, [] { QCoreApplication::exit(0); });
 }
 
 bool Application::updatesAreAllowed() const

@@ -81,11 +81,19 @@ LauncherPage::LauncherPage(QWidget* parent) : QWidget(parent), ui(new Ui::Launch
     ui->updateSettingsBox->hide();
     ui->modsBox->hide();
     ui->instanceBox->hide();
+    ui->labelSkinsDir->hide();
+    ui->skinsDirTextBox->hide();
+    ui->skinsDirBrowseBtn->hide();
     ui->instanceSortingLabel->setText(tr("Server sorting"));
     ui->renamingBehaviorLabel->setText(tr("Server renaming"));
     ui->sortByPlaytimeBtn->setText(tr("By total time running"));
     ui->editInstanceOnDoubleClick->setText(tr("&Open the editor when a server is double-clicked"));
     ui->editInstanceOnDoubleClick->setToolTip(tr("Opens the server window on double-click instead of starting the server."));
+    ui->labelInstDir->setText(tr("&Servers:"));
+    ui->labelIconsDir->setText(tr("Server &icons:"));
+    ui->labelModsDir->setText(tr("&Plugins:"));
+    ui->additionalInstDirsGroupBox->setTitle(tr("Additional server folders"));
+    ui->labelDownloadsDir->setToolTip(tr("Folder opened when adding a plugin from a file."));
 }
 
 LauncherPage::~LauncherPage()
@@ -149,7 +157,7 @@ void LauncherPage::on_addInstDirBtn_clicked()
 
     QString cookedDir = FS::NormalizePath(rawDir);
     if (cookedDir == FS::NormalizePath(ui->instDirTextBox->text())) {
-        QMessageBox::warning(this, tr("Duplicate directory"), tr("This is already your primary instance directory."));
+        QMessageBox::warning(this, tr("Duplicate directory"), tr("This is already your primary server folder."));
         return;
     }
 
@@ -382,4 +390,12 @@ void LauncherPage::loadSettings()
 void LauncherPage::retranslate()
 {
     ui->retranslateUi(this);
+    ui->instanceSortingLabel->setText(tr("Server sorting"));
+    ui->renamingBehaviorLabel->setText(tr("Server renaming"));
+    ui->sortByPlaytimeBtn->setText(tr("By total time running"));
+    ui->editInstanceOnDoubleClick->setText(tr("&Open the editor when a server is double-clicked"));
+    ui->labelInstDir->setText(tr("&Servers:"));
+    ui->labelIconsDir->setText(tr("Server &icons:"));
+    ui->labelModsDir->setText(tr("&Plugins:"));
+    ui->additionalInstDirsGroupBox->setTitle(tr("Additional server folders"));
 }

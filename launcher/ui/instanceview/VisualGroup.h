@@ -99,7 +99,8 @@ struct VisualGroup {
     /// x/y position of the given item inside the group (in items!)
     QPair<int, int> positionOf(const QModelIndex& index) const;
 
-    enum HitResult { NoHit = 0x0, TextHit = 0x1, CheckboxHit = 0x2, HeaderHit = 0x4, BodyHit = 0x8 };
+    enum HitResult { NoHit = 0x0, TextHit = 0x1, CheckboxHit = 0x2, HeaderHit = 0x4, BodyHit = 0x8, StartHit = 0x10 };
+    QRect startButtonRect() const;
     Q_DECLARE_FLAGS(HitResults, HitResult)
 
     /// shoot! BANG! what did we hit?

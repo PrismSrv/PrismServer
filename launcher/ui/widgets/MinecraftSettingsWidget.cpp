@@ -41,6 +41,7 @@
 #include "modplatform/ModIndex.h"
 #include "ui_MinecraftSettingsWidget.h"
 
+#include <QCheckBox>
 #include <QFileDialog>
 #include "Application.h"
 #include "BuildConfig.h"
@@ -150,6 +151,10 @@ MinecraftSettingsWidget::MinecraftSettingsWidget(MinecraftInstance* instance, QW
         m_ui->settingsTabs->removeTab(tweaksIndex);
 
     if (m_instance && m_instance->isServer()) {
+        m_startOnBoot = new QCheckBox(tr("Start this server when the PC starts"), this);
+        m_startOnBoot->setToolTip(tr("PrismServer starts in the notification area at login and launches this server. The main window stays closed."));
+        m_ui->verticalLayout->insertWidget(0, m_startOnBoot);
+
         const auto software = m_instance->settings()->get(QStringLiteral("ServerSoftware")).toString();
         QWidget* serverPage = nullptr;
         if (software == QLatin1String("velocity")) {
@@ -367,6 +372,9 @@ void MinecraftSettingsWidget::loadSettings()
 
     m_ui->globalDataPacksGroupBox->blockSignals(true);
     m_ui->dataPacksPathEdit->blockSignals(true);
+    if (m_startOnBoot != nullptr)
+        m_startOnBoot->setChecked(settings->get("StartOnBoot").toBool());
+
     m_ui->globalDataPacksGroupBox->setChecked(settings->get("GlobalDataPacksEnabled").toBool());
     m_ui->dataPacksPathEdit->setText(settings->get("GlobalDataPacksPath").toString().trimmed());
     m_ui->globalDataPacksGroupBox->blockSignals(false);
@@ -387,6 +395,10 @@ void MinecraftSettingsWidget::saveSettings()
         m_serverProperties->save();
     if (m_velocitySettings != nullptr)
         m_velocitySettings->save();
+    if (m_startOnBoot != nullptr) {
+        settings->set("StartOnBoot", m_startOnBoot->isChecked());
+        APPLICATION->syncStartOnBoot();
+    }
 
     // Console
     bool console = m_instance == nullptr || m_ui->consoleSettingsBox->isChecked();

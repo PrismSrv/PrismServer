@@ -286,6 +286,7 @@ void MinecraftInstance::loadSpecificSettings()
     m_settings->registerSetting("OverrideModDownloadLoaders", false);
     m_settings->registerSetting("ModDownloadLoaders", "[]");
 
+    m_settings->registerSetting("StartOnBoot", false);
     m_settings->registerSetting("ServerSoftware", "");
     m_settings->registerSetting("ServerVersion", "");
     m_settings->registerSetting("ServerBuild", "");

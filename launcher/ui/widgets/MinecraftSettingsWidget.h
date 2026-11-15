@@ -36,6 +36,7 @@
 
 #pragma once
 
+#include <QCheckBox>
 #include <QWidget>
 #include "JavaSettingsWidget.h"
 #include "minecraft/MinecraftInstance.h"
@@ -72,5 +73,6 @@ class MinecraftSettingsWidget : public QWidget {
     JavaSettingsWidget* m_javaSettings = nullptr;
     ServerPropertiesWidget* m_serverProperties = nullptr;
     VelocitySettingsWidget* m_velocitySettings = nullptr;
+    QCheckBox* m_startOnBoot = nullptr;
     bool m_quickPlaySingleplayer = false;
 };

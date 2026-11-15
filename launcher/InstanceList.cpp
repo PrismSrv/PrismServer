@@ -280,6 +280,7 @@ void InstanceList::deleteGroup(const GroupId& name)
 {
     m_groupNameCache.remove(name);
     m_collapsedGroups.remove(name);
+    m_bootGroups.remove(name);
 
     bool removed = false;
     qDebug() << "Delete group" << name;
@@ -307,6 +308,9 @@ void InstanceList::renameGroup(const QString& src, const QString& dst)
     if (m_collapsedGroups.remove(src)) {
         m_collapsedGroups.insert(dst);
     }
+    if (m_bootGroups.remove(src)) {
+        m_bootGroups.insert(dst);
+    }
 
     bool modified = false;
     qDebug() << "Rename group" << src << "to" << dst;
@@ -332,6 +336,22 @@ void InstanceList::renameGroup(const QString& src, const QString& dst)
 bool InstanceList::isGroupCollapsed(const QString& group)
 {
     return m_collapsedGroups.contains(group);
+}
+
+bool InstanceList::groupStartsOnBoot(const QString& groupName) const
+{
+    return m_bootGroups.contains(groupName);
+}
+
+void InstanceList::setGroupStartsOnBoot(const QString& groupName, bool enabled)
+{
+    if (groupName.isEmpty())
+        return;
+    if (enabled)
+        m_bootGroups.insert(groupName);
+    else
+        m_bootGroups.remove(groupName);
+    saveGroupList();
 }
 
 bool InstanceList::trashInstance(const InstanceId& id)
@@ -717,9 +737,10 @@ void InstanceList::decreaseGroupCount(const QString& group)
         return;
     }
 
-    if (--m_groupNameCache[group] < 1) {
+        if (--m_groupNameCache[group] < 1) {
         m_groupNameCache.remove(group);
         m_collapsedGroups.remove(group);
+        m_bootGroups.remove(group);
     }
 }
 
@@ -752,6 +773,7 @@ void InstanceList::saveGroupList()
         QJsonObject groupObj;
         QJsonArray instanceArr;
         groupObj.insert("hidden", QJsonValue(m_collapsedGroups.contains(name)));
+        groupObj.insert("startOnBoot", QJsonValue(m_bootGroups.contains(name)));
         for (const auto& item : list) {
             instanceArr.append(QJsonValue(item));
         }
@@ -783,6 +805,7 @@ void InstanceList::loadGroupList()
     m_instanceGroupIndex.clear();
     m_groupNameCache.clear();
     m_collapsedGroups.clear();
+    m_bootGroups.clear();
 
     bool migratingLegacyGroups = false;
 
@@ -849,6 +872,9 @@ void InstanceList::loadGroupList()
         auto hidden = groupObj.value("hidden").toBool(false);
         if (hidden) {
             m_collapsedGroups.insert(groupName);
+        }
+        if (groupObj.value("startOnBoot").toBool(false)) {
+            m_bootGroups.insert(groupName);
         }
 
         QJsonArray instancesArray = groupObj.value("instances").toArray();

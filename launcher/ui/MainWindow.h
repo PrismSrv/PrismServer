@@ -233,6 +233,8 @@ class MainWindow : public QMainWindow {
     void instanceFromInstanceTask(InstanceTask* task);
 
     void handleInstanceRename(const QString& before, const QString& after);
+    void startGroup(const QString& group);
+    void editGroupSettings(const QString& group);
 
    private:
     Ui::MainWindow* ui;

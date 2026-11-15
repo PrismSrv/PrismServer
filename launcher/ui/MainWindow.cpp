@@ -45,9 +45,13 @@
 #include "MainWindow.h"
 #include "ui_MainWindow.h"
 
+#include <QCheckBox>
+#include <QDialog>
+#include <QDialogButtonBox>
 #include <QDir>
 #include <QFileInfo>
 #include <QUrl>
+#include <QVBoxLayout>
 #include <QUrlQuery>
 #include <QVariant>
 
@@ -241,8 +245,9 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::MainWi
         ui->actionMoreNews->setVisible(false);
         ui->newsToolBar->hide();
         ui->actionViewSkinsFolder->setVisible(false);
-        ui->actionViewCentralModsFolder->setVisible(false);
         ui->actionManageSkins->setVisible(false);
+        ui->actionViewCentralModsFolder->setText(tr("&Plugins"));
+        ui->actionViewCentralModsFolder->setToolTip(tr("Open the plugins folder."));
 
 #ifndef Q_OS_MAC
         ui->actionAddToPATH->setVisible(false);
@@ -337,6 +342,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::MainWi
         view->setSourceOfGroupCollapseStatus(
             [](const QString& groupName) -> bool { return APPLICATION->instances()->isGroupCollapsed(groupName); });
         connect(view, &InstanceView::groupStateChanged, APPLICATION->instances(), &InstanceList::on_GroupStateChanged);
+        connect(view, &InstanceView::groupStartRequested, this, &MainWindow::startGroup);
         ui->horizontalLayout->addWidget(view);
     }
     // The cat background
@@ -477,6 +483,9 @@ void MainWindow::retranslateUi()
         if (action->toolTip().contains("%1"))
             action->setToolTip(action->toolTip().arg(BuildConfig.LAUNCHER_DISPLAYNAME));
     }
+
+    ui->actionViewCentralModsFolder->setText(tr("&Plugins"));
+    ui->actionViewCentralModsFolder->setToolTip(tr("Open the plugins folder."));
 }
 
 MainWindow::~MainWindow() {}
@@ -573,7 +582,14 @@ void MainWindow::showInstanceContextMenu(const QPoint& pos)
         actions.prepend(actionSep);
         actions.prepend(actionVoid);
         actions.append(actionCreateInstance);
+        auto* actionStartGroup = new QAction(tr("&Start all servers"), menu);
+        connect(actionStartGroup, &QAction::triggered, this, [this, group] { startGroup(group); });
+        actions.append(actionStartGroup);
         if (!group.isNull()) {
+            auto* actionGroupSettings = new QAction(tr("Group &settings..."), menu);
+            connect(actionGroupSettings, &QAction::triggered, this, [this, group] { editGroupSettings(group); });
+            actions.append(actionGroupSettings);
+
             auto* actionDeleteGroup = new QAction(tr("&Delete group"), menu);
             connect(actionDeleteGroup, &QAction::triggered, this, [this, group] { deleteGroup(group); });
             actions.append(actionDeleteGroup);
@@ -1267,6 +1283,36 @@ void MainWindow::deleteGroup(QString group)
                                             QMessageBox::Yes | QMessageBox::No);
     if (reply == QMessageBox::Yes)
         APPLICATION->instances()->deleteGroup(group);
+}
+
+void MainWindow::startGroup(const QString& group)
+{
+    auto* instances = APPLICATION->instances();
+    for (int i = 0; i < instances->count(); ++i) {
+        auto* inst = instances->at(i);
+        if (instances->getInstanceGroup(inst->id()) != group || inst->isRunning())
+            continue;
+        APPLICATION->launch(inst);
+    }
+}
+
+void MainWindow::editGroupSettings(const QString& group)
+{
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("Group settings"));
+    auto* layout = new QVBoxLayout(&dialog);
+    auto* check = new QCheckBox(tr("Start servers in this group when the PC starts"), &dialog);
+    check->setToolTip(tr("PrismServer starts in the notification area at login and launches every server in this group. The main window stays closed."));
+    check->setChecked(APPLICATION->instances()->groupStartsOnBoot(group));
+    layout->addWidget(check);
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+    layout->addWidget(buttons);
+    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+    APPLICATION->instances()->setGroupStartsOnBoot(group, check->isChecked());
+    APPLICATION->syncStartOnBoot();
 }
 
 void MainWindow::renameGroup(QString group)
