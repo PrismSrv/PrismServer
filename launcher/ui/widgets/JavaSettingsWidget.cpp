@@ -90,6 +90,14 @@ JavaSettingsWidget::JavaSettingsWidget(MinecraftInstance* instance, QWidget* par
         m_ui->memoryGroupBox->setCheckable(true);
         m_ui->javaArgumentsGroupBox->setCheckable(true);
 
+        if (m_instance->isServer()) {
+            m_ui->skipCompatibilityCheckBox->hide();
+            m_ui->label_11->hide();
+            m_ui->permGenSpinBox->hide();
+            m_ui->label_3->hide();
+            m_ui->lowMemWarningCheckBox->hide();
+        }
+
         SettingsObject* settings = m_instance->settings();
 
         connect(settings->getSetting("OverrideJavaLocation").get(), &Setting::SettingChanged, m_ui->javaInstallationGroupBox,

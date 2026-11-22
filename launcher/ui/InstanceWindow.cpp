@@ -175,6 +175,8 @@ void InstanceWindow::updateButtons()
         m_launchButton->setPopupMode(QToolButton::DelayedPopup);
         m_launchButton->setText(tr("&Start"));
         m_killButton->setText(tr("&Stop"));
+        m_restartButton->setText(tr("&Restart"));
+        m_restartButton->setToolTip(tr("Stop the server and start it again."));
         return;
     }
 
@@ -198,7 +200,7 @@ void InstanceWindow::runningStateChanged(bool running)
     m_container->refreshContainer();
     if (running) {
         selectPage("log");
-    } else if (m_restartQueued) {
+    } else if (m_restartQueued && !m_instance->isServer()) {
         m_restartQueued = false;
         // Wait until the current launch controller has handled the stopped instance before launching again.
         QTimer::singleShot(0, this, [this] {
@@ -208,9 +210,31 @@ void InstanceWindow::runningStateChanged(bool running)
     }
 }
 
+void InstanceWindow::continueRestart()
+{
+    if (!m_restartQueued || !m_instance || m_instance->isRunning())
+        return;
+    m_restartQueued = false;
+    APPLICATION->launch(m_instance);
+    updateButtons();
+}
+
 void InstanceWindow::restartInstance()
 {
     if (!m_instance->isRunning()) {
+        return;
+    }
+
+    if (m_instance->isServer()) {
+        m_restartQueued = true;
+        if (!APPLICATION->kill(m_instance, false)) {
+            m_restartQueued = false;
+            updateButtons();
+            return;
+        }
+        updateButtons();
+        if (!m_instance->isRunning())
+            QTimer::singleShot(0, this, &InstanceWindow::continueRestart);
         return;
     }
 

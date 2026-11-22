@@ -537,6 +537,12 @@ void LaunchController::onProgressRequested(Task* task) const
 
 bool LaunchController::abort()
 {
+    stopInstance(true);
+    return !m_instance || !m_instance->isRunning();
+}
+
+bool LaunchController::stopInstance(bool confirm)
+{
     if (!m_launcher) {
         return true;
     }
@@ -548,25 +554,30 @@ bool LaunchController::abort()
     }
     if (m_instance && m_instance->isServer()) {
         if (!m_serverStopSent) {
-            auto response = CustomMessageBox::selectable(m_parentWidget, tr("Stop the server?"),
-                                                         tr("This sends the stop command. Stop the server again to kill the process if it "
-                                                            "does not exit."),
-                                                         QMessageBox::Question, QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes)
+            if (confirm) {
+                auto response = CustomMessageBox::selectable(m_parentWidget, tr("Stop the server?"),
+                                                             tr("This sends the stop command. Stop the server again to kill the process if it "
+                                                                "does not exit."),
+                                                             QMessageBox::Question, QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes)
+                                    ->exec();
+                if (response != QMessageBox::Yes)
+                    return false;
+            }
+            m_launcher->abort();
+            m_serverStopSent = true;
+            return true;
+        }
+
+        if (confirm) {
+            auto response = CustomMessageBox::selectable(m_parentWidget, tr("Kill the server process?"),
+                                                         tr("The stop command was already sent. Kill the process?"), QMessageBox::Question,
+                                                         QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes)
                                 ->exec();
             if (response != QMessageBox::Yes)
                 return false;
-            m_launcher->abort();
-            m_serverStopSent = true;
-            return false;
         }
-
-        auto response = CustomMessageBox::selectable(m_parentWidget, tr("Kill the server process?"),
-                                                     tr("The stop command was already sent. Kill the process?"), QMessageBox::Question,
-                                                     QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes)
-                            ->exec();
-        if (response != QMessageBox::Yes)
-            return false;
-        return m_launcher->abort();
+        m_launcher->abort();
+        return true;
     }
     auto response = CustomMessageBox::selectable(m_parentWidget, tr("Kill Minecraft?"),
                                                  tr("This can cause the instance to get corrupted and should only be used if Minecraft "

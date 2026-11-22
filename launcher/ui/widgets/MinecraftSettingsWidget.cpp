@@ -149,10 +149,12 @@ MinecraftSettingsWidget::MinecraftSettingsWidget(MinecraftInstance* instance, QW
     m_ui->perfomanceGroupBox->hide();
     if (const int tweaksIndex = m_ui->settingsTabs->indexOf(m_ui->tweaksPage); tweaksIndex >= 0)
         m_ui->settingsTabs->removeTab(tweaksIndex);
+    if (const int commandsIndex = m_ui->settingsTabs->indexOf(m_ui->customCommandsPage); commandsIndex >= 0)
+        m_ui->settingsTabs->removeTab(commandsIndex);
 
     if (m_instance && m_instance->isServer()) {
         m_startOnBoot = new QCheckBox(tr("Start this server when the PC starts"), this);
-        m_startOnBoot->setToolTip(tr("PrismServer starts in the notification area at login and launches this server. The main window stays closed."));
+        m_startOnBoot->setToolTip(tr("PrismServer launches this server when the PC starts. The icon appears only while a server is running, and the main window stays closed."));
         m_ui->verticalLayout->insertWidget(0, m_startOnBoot);
 
         const auto software = m_instance->settings()->get(QStringLiteral("ServerSoftware")).toString();

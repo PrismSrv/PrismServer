@@ -71,6 +71,8 @@ class LaunchController : public Task {
     QString id() const { return m_instance->id(); }
 
     bool abort() override;
+    // Returns true when a stop was accepted. The process may still be shutting down.
+    bool stopInstance(bool confirm);
 
    private:
     void login();

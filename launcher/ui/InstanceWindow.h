@@ -68,6 +68,8 @@ class InstanceWindow : public QMainWindow, public BasePageContainer {
     // request closing the window (from a page)
     bool requestClose() override;
 
+    void continueRestart();
+
    signals:
     void isClosing();
 

@@ -1302,7 +1302,7 @@ void MainWindow::editGroupSettings(const QString& group)
     dialog.setWindowTitle(tr("Group settings"));
     auto* layout = new QVBoxLayout(&dialog);
     auto* check = new QCheckBox(tr("Start servers in this group when the PC starts"), &dialog);
-    check->setToolTip(tr("PrismServer starts in the notification area at login and launches every server in this group. The main window stays closed."));
+    check->setToolTip(tr("PrismServer launches every server in this group when the PC starts. The icon appears only while a server is running, and the main window stays closed."));
     check->setChecked(APPLICATION->instances()->groupStartsOnBoot(group));
     layout->addWidget(check);
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);

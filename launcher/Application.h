@@ -217,7 +217,7 @@ class Application : public QApplication {
                 std::shared_ptr<MinecraftTarget> targetToJoin = nullptr,
                 shared_qobject_ptr<MinecraftAccount> accountToUse = nullptr,
                 const QString& offlineName = QString());
-    bool kill(BaseInstance* instance);
+    bool kill(BaseInstance* instance, bool confirm = true);
     static void closeCurrentWindow();
 
    private slots:
@@ -230,6 +230,8 @@ class Application : public QApplication {
     bool createSetupWizard();
     void performMainStartupAction();
     void showBootTray();
+    void hideTrayIcon();
+    bool hasOpenUi() const;
     void launchBootInstances();
     void quitBootTray();
     bool anyInstanceStartsOnBoot() const;
@@ -314,6 +316,8 @@ class Application : public QApplication {
     bool m_showMainWindow = false;
     bool m_startOnBoot = false;
     bool m_trayQuitting = false;
+    bool m_hidingTray = false;
+    int m_bootPending = 0;
     QSystemTrayIcon* m_tray = nullptr;
     std::unique_ptr<QFile> logFile;
     std::unique_ptr<LogModel> logModel;

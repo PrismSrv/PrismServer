@@ -1356,7 +1356,6 @@ void Application::performMainStartupAction()
     m_status = Application::Initialized;
     syncStartOnBoot();
     if (m_startOnBoot) {
-        showBootTray();
         QTimer::singleShot(0, this, &Application::launchBootInstances);
         return;
     }
@@ -1592,7 +1591,7 @@ bool Application::launch(MinecraftInstance* instance,
     return false;
 }
 
-bool Application::kill(BaseInstance* instance)
+bool Application::kill(BaseInstance* instance, bool confirm)
 {
     if (!instance->isRunning()) {
         qWarning() << "Attempted to kill instance" << instance->id() << ", which isn't running.";
@@ -1604,7 +1603,7 @@ bool Application::kill(BaseInstance* instance)
     auto& controller = extras.controller;
     locker.unlock();
     if (controller) {
-        return controller->abort();
+        return controller->stopInstance(confirm);
     }
     return true;
 }
@@ -1634,21 +1633,36 @@ void Application::subRunningInstance()
     m_runningInstances--;
     if (m_runningInstances == 0) {
         emit updateAllowedChanged(true);
-        if (!m_startOnBoot && m_tray && !m_trayQuitting) {
-            m_tray->hide();
-            m_tray->deleteLater();
-            m_tray = nullptr;
-        }
+        if (m_tray && !m_trayQuitting)
+            QTimer::singleShot(0, this, [this] { hideTrayIcon(); });
     }
+}
+
+bool Application::hasOpenUi() const
+{
+    if (m_openWindows > 0 || m_mainWindow || m_viewLogWindow)
+        return true;
+    for (const auto& entry : m_instanceExtras) {
+        if (entry.second.window)
+            return true;
+    }
+    for (auto* widget : topLevelWidgets()) {
+        if (!widget->isVisible())
+            continue;
+        if (widget->inherits("QMenu") || widget->windowFlags().testFlag(Qt::ToolTip))
+            continue;
+        return true;
+    }
+    return false;
 }
 
 bool Application::shouldExitNow() const
 {
     if (m_trayQuitting)
         return m_runningInstances == 0;
-    if (m_startOnBoot)
+    if (m_bootPending > 0 || m_runningInstances > 0)
         return false;
-    return m_runningInstances == 0 && m_openWindows == 0;
+    return !hasOpenUi();
 }
 
 bool Application::anyInstanceStartsOnBoot() const
@@ -1682,10 +1696,24 @@ void Application::syncStartOnBoot()
 #endif
 }
 
+void Application::hideTrayIcon()
+{
+    if (!m_tray || m_trayQuitting || m_runningInstances > 0)
+        return;
+    m_hidingTray = true;
+    m_tray->setContextMenu(nullptr);
+    m_tray->hide();
+    m_hidingTray = false;
+}
+
 void Application::showBootTray()
 {
-    if (m_tray)
+    if (m_hidingTray)
         return;
+    if (m_tray) {
+        m_tray->show();
+        return;
+    }
     if (!QSystemTrayIcon::isSystemTrayAvailable()) {
         qWarning() << "No system tray is available. Servers will still start.";
         return;
@@ -1719,18 +1747,28 @@ void Application::launchBootInstances()
         if (inst->settings()->get("StartOnBoot").toBool() || grouped)
             ids << inst->id();
     }
+    if (ids.isEmpty()) {
+        exit(0);
+        return;
+    }
+    m_bootPending = ids.size();
     for (int i = 0; i < ids.size(); ++i) {
         const auto id = ids.at(i);
         QTimer::singleShot(i * 1500, this, [this, id] {
             auto* inst = instances()->getInstanceById(id);
             if (inst && !inst->isRunning())
                 launch(inst);
+            m_bootPending--;
+            if (shouldExitNow())
+                exit(0);
         });
     }
 }
 
 void Application::quitBootTray()
 {
+    if (m_hidingTray)
+        return;
     m_trayQuitting = true;
     bool stopping = false;
     if (m_instances) {
@@ -1770,19 +1808,42 @@ void Application::controllerFinished()
     auto& extras = m_instanceExtras.at(id);
 
     const bool wasSuccessful = controller->wasSuccessful();
+    auto* window = extras.window;
     // on success, do...
     if (wasSuccessful && controller->instance()->settings()->get("AutoCloseConsole").toBool()) {
-        if (extras.window) {
-            QMetaObject::invokeMethod(extras.window, &QWidget::close, Qt::QueuedConnection);
+        if (window) {
+            QMetaObject::invokeMethod(window, &QWidget::close, Qt::QueuedConnection);
         }
     }
-    extras.controller.reset();
+    // The controller is still inside its finished signal. Delete it only after that returns.
+    auto* oldController = extras.controller.release();
+    locker.unlock();
+    if (oldController) {
+        connect(oldController, &QObject::destroyed, this, [this, id] {
+            QTimer::singleShot(0, this, [this, id] {
+                InstanceWindow* restartWindow = nullptr;
+                {
+                    QMutexLocker locker(&m_instanceExtrasMutex);
+                    auto it = m_instanceExtras.find(id);
+                    if (it != m_instanceExtras.end())
+                        restartWindow = it->second.window;
+                }
+                if (restartWindow)
+                    restartWindow->continueRestart();
+            });
+        });
+        oldController->deleteLater();
+    }
     subRunningInstance();
 
-    // quit when there are no more windows.
+    // Quit only once the stop handler has returned, and only when nothing is left open.
     if (shouldExitNow()) {
         m_status = wasSuccessful ? Succeeded : Failed;
-        exit(wasSuccessful ? 0 : 1);
+        const int code = wasSuccessful ? 0 : 1;
+        QTimer::singleShot(0, this, [this, code] {
+            if (shouldExitNow())
+                QCoreApplication::exit(code);
+        });
     }
 }
 

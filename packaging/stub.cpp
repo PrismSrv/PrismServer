@@ -2,6 +2,7 @@
 #include <windows.h>
 #include <shellapi.h>
 #include <shlobj.h>
+#include <tlhelp32.h>
 #include <stdint.h>
 
 #include <string>
@@ -48,6 +49,41 @@ bool writeStamp(const std::wstring& path, uint64_t stamp)
     const BOOL ok = WriteFile(file, &stamp, sizeof(stamp), &written, nullptr);
     CloseHandle(file);
     return ok && written == sizeof(stamp);
+}
+
+void closeInstalledLauncher(const std::wstring& exePath)
+{
+    HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    if (snap == INVALID_HANDLE_VALUE)
+        return;
+    PROCESSENTRY32W entry = {};
+    entry.dwSize = sizeof(entry);
+    if (Process32FirstW(snap, &entry)) {
+        do {
+            if (_wcsicmp(entry.szExeFile, L"prismlauncher.exe") != 0)
+                continue;
+            HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_TERMINATE, FALSE, entry.th32ProcessID);
+            if (!process)
+                continue;
+            wchar_t path[MAX_PATH] = {};
+            DWORD size = MAX_PATH;
+            if (QueryFullProcessImageNameW(process, 0, path, &size) && _wcsicmp(path, exePath.c_str()) == 0)
+                TerminateProcess(process, 0);
+            CloseHandle(process);
+        } while (Process32NextW(snap, &entry));
+    }
+    CloseHandle(snap);
+
+    for (int attempt = 0; attempt < 30; ++attempt) {
+        HANDLE file = CreateFileW(exePath.c_str(), GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+        if (file != INVALID_HANDLE_VALUE) {
+            CloseHandle(file);
+            return;
+        }
+        if (GetLastError() == ERROR_FILE_NOT_FOUND)
+            return;
+        Sleep(100);
+    }
 }
 
 void removeTree(const std::wstring& path)
@@ -185,6 +221,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int)
         self = INVALID_HANDLE_VALUE;
 
         SHCreateDirectoryExW(nullptr, dest.c_str(), nullptr);
+        closeInstalledLauncher(dest + L"\\prismlauncher.exe");
         removeTree(dest);
         SHCreateDirectoryExW(nullptr, dest.c_str(), nullptr);
 
@@ -196,7 +233,13 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int)
         if (status)
             DestroyWindow(status);
         if (!extracted || !writeStamp(stampPath, footer.stamp)) {
-            MessageBoxW(nullptr, L"Could not set up PrismServer.", L"PrismServer", MB_ICONERROR);
+            const std::wstring installedExe = dest + L"\\prismlauncher.exe";
+            HANDLE locked = CreateFileW(installedExe.c_str(), GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+            const bool busy = locked == INVALID_HANDLE_VALUE && GetLastError() == ERROR_SHARING_VIOLATION;
+            if (locked != INVALID_HANDLE_VALUE)
+                CloseHandle(locked);
+            MessageBoxW(nullptr, busy ? L"Close PrismServer, then open this file again." : L"Could not set up PrismServer.", L"PrismServer",
+                        MB_ICONERROR);
             return 1;
         }
     } else {
