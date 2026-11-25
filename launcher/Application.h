@@ -67,6 +67,7 @@ class IconList;
 class QNetworkAccessManager;
 class JavaInstallList;
 class ExternalUpdater;
+class PrismServerUpdate;
 class BaseProfilerFactory;
 class BaseDetachedToolFactory;
 class TranslationsModel;
@@ -252,6 +253,7 @@ class Application : public QApplication {
     std::unique_ptr<QNetworkAccessManager> m_network;
 
     std::unique_ptr<ExternalUpdater> m_updater;
+    PrismServerUpdate* m_prismUpdate = nullptr;
     std::unique_ptr<AccountList> m_accounts;
 
     std::unique_ptr<HttpMetaCache> m_metacache;

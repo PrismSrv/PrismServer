@@ -51,6 +51,25 @@ bool writeStamp(const std::wstring& path, uint64_t stamp)
     return ok && written == sizeof(stamp);
 }
 
+bool writeLauncherPath(const std::wstring& path, const std::wstring& exePath)
+{
+    if (exePath.empty())
+        return false;
+    const int bytes = WideCharToMultiByte(CP_UTF8, 0, exePath.c_str(), static_cast<int>(exePath.size()), nullptr, 0, nullptr, nullptr);
+    if (bytes <= 0)
+        return false;
+    std::string utf8(static_cast<size_t>(bytes), '\0');
+    WideCharToMultiByte(CP_UTF8, 0, exePath.c_str(), static_cast<int>(exePath.size()), utf8.data(), bytes, nullptr, nullptr);
+
+    HANDLE file = CreateFileW(path.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (file == INVALID_HANDLE_VALUE)
+        return false;
+    DWORD written = 0;
+    const BOOL ok = WriteFile(file, utf8.data(), static_cast<DWORD>(utf8.size()), &written, nullptr);
+    CloseHandle(file);
+    return ok && written == utf8.size();
+}
+
 void closeInstalledLauncher(const std::wstring& exePath)
 {
     HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
@@ -183,8 +202,9 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int)
 
     const std::wstring stampPath = dest + L"\\installed.stamp";
     uint64_t installed = 0;
-    const bool current = readStamp(stampPath, &installed) && installed == footer.stamp;
-    if (!current) {
+    const bool haveInstalled = readStamp(stampPath, &installed);
+    const bool newer = !haveInstalled || footer.stamp > installed;
+    if (newer) {
         HWND status = showStatus(instance);
         wchar_t tempDir[MAX_PATH] = {};
         GetTempPathW(MAX_PATH, tempDir);
@@ -245,6 +265,8 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int)
     } else {
         CloseHandle(self);
     }
+
+    writeLauncherPath(dest + L"\\launcher.path", selfPath);
 
     const std::wstring exe = dest + L"\\prismlauncher.exe";
     std::wstring command = L"\"" + exe + L"\"";

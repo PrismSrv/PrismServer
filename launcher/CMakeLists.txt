@@ -174,6 +174,8 @@ set(MAC_UPDATE_SOURCES
 set(PRISM_UPDATE_SOURCES
     updater/PrismExternalUpdater.h
     updater/PrismExternalUpdater.cpp
+    updater/PrismServerUpdate.h
+    updater/PrismServerUpdate.cpp
 )
 
 # Backend for the news bar... there's usually no news.

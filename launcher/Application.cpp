@@ -159,6 +159,7 @@
 #endif
 #else
 #include "updater/PrismExternalUpdater.h"
+#include "updater/PrismServerUpdate.h"
 #endif
 
 #if defined Q_OS_WIN32
@@ -1879,6 +1880,12 @@ MainWindow* Application::showMainWindow(bool minimized)
         }
 
         m_mainWindow->checkInstancePathForProblems();
+#if !defined(Q_OS_MAC)
+        if (!m_prismUpdate) {
+            m_prismUpdate = new PrismServerUpdate(network(), m_mainWindow, this);
+            QTimer::singleShot(0, m_prismUpdate, [this] { m_prismUpdate->check(); });
+        }
+#endif
         connect(this, &Application::updateAllowedChanged, m_mainWindow, &MainWindow::updatesAllowedChanged);
         connect(m_mainWindow, &MainWindow::isClosing, this, &Application::on_windowClose);
         m_openWindows++;
