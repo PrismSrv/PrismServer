@@ -24,7 +24,7 @@
 
 namespace {
 // Release version of this build. Keep it equal to the GitHub tag, without the leading v.
-constexpr auto kCurrentVersion = "0.1.3";
+constexpr auto kCurrentVersion = "0.1.4";
 constexpr auto kAssetName = "PrismServer.exe";
 constexpr auto kReleasesUrl = "https://api.github.com/repos/PrismSrv/PrismServer/releases?per_page=20";
 
